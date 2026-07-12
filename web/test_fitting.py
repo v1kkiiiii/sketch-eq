@@ -3,7 +3,7 @@ Quick correctness checks for fitting.py against synthetic ground-truth
 shapes. Run with: python3 test_fitting.py
 """
 import numpy as np
-from fitting import Point, process_stroke, split_monotonic_runs, best_poly_fit, fit_circle
+from fitting import Point, process_stroke, fit_circle
 
 
 def approx(a, b, tol=0.05):
@@ -11,17 +11,12 @@ def approx(a, b, tol=0.05):
 
 
 def test_line():
-    # slope 2 over x in [-3,3] means range_y (12) > range_x (6), so the
-    # algorithm correctly picks y as the *independent* axis and reports
-    # x = 0.5y - 1.5 (the algebraic inverse of y = 2x + 3) -- both are
-    # the same line, just parametrized by whichever axis has more spread.
     pts = [Point(x, 2 * x + 3) for x in np.arange(-3, 3.01, 0.3)]
     eqs = process_stroke(pts)
     assert len(eqs) == 1, f"expected 1 equation, got {len(eqs)}"
     print("LINE:", eqs[0].latex, "|", eqs[0].domain, "|", eqs[0].meta)
     assert "R\u00B2 = 1.0" in eqs[0].meta
 
-    # gentler slope -> range_x >= range_y -> reports y = f(x) directly
     pts2 = [Point(x, 0.5 * x + 3) for x in np.arange(-3, 3.01, 0.3)]
     eqs2 = process_stroke(pts2)
     assert len(eqs2) == 1
@@ -38,7 +33,6 @@ def test_parabola():
 
 
 def test_v_shape_splits_into_two_equations():
-    # V shape: x decreases then increases -> should split into 2 segments
     left = [Point(x, abs(x)) for x in np.arange(-3, 0.01, 0.2)]
     right = [Point(x, abs(x)) for x in np.arange(0, 3.01, 0.2)]
     pts = left + right
@@ -55,7 +49,6 @@ def test_circle():
     eqs = process_stroke(pts)
     assert len(eqs) == 1
     print("CIRCLE:", eqs[0].latex, "|", eqs[0].domain)
-    # smoothing pulls points slightly inward, so allow a small tolerance
     assert "radius 2.9" in eqs[0].domain or "radius 3.0" in eqs[0].domain
     assert "center (2.0" in eqs[0].domain
 

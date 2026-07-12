@@ -65,8 +65,7 @@ def split_monotonic_runs(points: List[Point], axis: str) -> List[Tuple[int, int]
     """
     Split the point sequence into maximal runs where `axis` (x or y) is
     monotonic. A direction reversal ends one run and starts the next
-    (sharing the reversal point as a boundary). This is what produces
-    multiple equations from a single stroke, e.g. a "V" shape.
+    (sharing the reversal point as a boundary).
     """
     runs = []
     start = 0
@@ -94,13 +93,12 @@ def _poly_fit_degree(u: np.ndarray, v: np.ndarray, deg: int):
     """
     Least-squares fit of v ~ poly(u) of given degree, using numpy's
     Polynomial.fit which internally maps u onto [-1, 1] before solving
-    (equivalent in spirit to mean-centering / rescaling) for numerical
-    stability, then we convert back to the standard power basis so the
-    displayed equation reads as an ordinary polynomial in x or y.
+    for numerical stability, then converted back to the standard power
+    basis so the displayed equation reads as an ordinary polynomial.
     """
     p = np.polynomial.Polynomial.fit(u, v, deg)
     standard = p.convert(kind=np.polynomial.Polynomial)
-    coeffs = standard.coef  # ascending order: c0 + c1*u + c2*u^2 ...
+    coeffs = standard.coef
     pred = standard(u)
     ss_res = float(np.sum((v - pred) ** 2))
     ss_tot = float(np.sum((v - v.mean()) ** 2))
@@ -108,70 +106,10 @@ def _poly_fit_degree(u: np.ndarray, v: np.ndarray, deg: int):
     return coeffs, r2
 
 
-def _find_corner_index(u: np.ndarray, v: np.ndarray) -> Optional[int]:
-    """
-    Find the interior point with the sharpest turn (largest angle between
-    the incoming and outgoing chord vectors), scaled to look at u and v on
-    comparable footing. Returns None if there's no point with a genuinely
-    sharp turn (i.e. the curve just bends smoothly, like a parabola vertex,
-    rather than having a real corner, like the tip of a "V").
-    """
-    n = len(u)
-    if n < 6:
-        return None
-    # normalize both axes to comparable scale before measuring angles
-    u_span = max(u.max() - u.min(), 1e-9)
-    v_span = max(v.max() - v.min(), 1e-9)
-    un, vn = u / u_span, v / v_span
-    best_idx, best_angle = None, 0.0
-    for i in range(2, n - 2):
-        v1 = np.array([un[i] - un[i - 2], vn[i] - vn[i - 2]])
-        v2 = np.array([un[i + 2] - un[i], vn[i + 2] - vn[i]])
-        n1, n2 = np.linalg.norm(v1), np.linalg.norm(v2)
-        if n1 < 1e-9 or n2 < 1e-9:
-            continue
-        cos_angle = np.clip(np.dot(v1, v2) / (n1 * n2), -1, 1)
-        angle = np.degrees(np.arccos(cos_angle))
-        if angle > best_angle:
-            best_angle, best_idx = angle, i
-    # a genuine corner (like a V) turns sharply (>35 deg); smooth bends
-    # (like a parabola's vertex) stay well under that even at the vertex
-    if best_idx is not None and best_angle > 35:
-        return best_idx
-    return None
-
-
-def fit_run_recursive(pts: List[Point], axis: str, s: int, e: int, depth: int = 0, max_depth: int = 3):
-    """
-    Fit points[s..e] (inclusive, indices into the full point list) as a
-    single polynomial if it fits well; otherwise split at the sharpest
-    corner and recurse on each half. This is what lets a hard corner (a
-    "V") become two equations while a smooth curve (a parabola) stays one,
-    even though both are non-monotonic in the dependent variable.
-    """
-    dep = "y" if axis == "x" else "x"
-    seg = pts[s:e + 1]
-    u = np.array([getattr(p, axis) for p in seg])
-    v = np.array([getattr(p, dep) for p in seg])
-    fit = best_poly_fit(u, v)
-
-    corner = None if depth >= max_depth or len(seg) < 6 else _find_corner_index(u, v)
-    if corner is not None and (fit is None or fit["r2"] < 0.995):
-        mid = s + corner
-        left = fit_run_recursive(pts, axis, s, mid, depth + 1, max_depth)
-        right = fit_run_recursive(pts, axis, mid, e, depth + 1, max_depth)
-        return left + right
-
-    if fit is None:
-        return []
-    return [(s, e, fit)]
-
-
 def best_poly_fit(u: np.ndarray, v: np.ndarray):
     """
     Try increasing polynomial degree (1..min(len-1, 4)) and stop at the
-    first degree that explains the data well (R^2 >= 0.995), so a simple
-    line doesn't get reported as an unnecessary degree-4 curve.
+    first degree that explains the data well (R^2 >= 0.995).
     """
     max_deg = max(1, min(len(u) - 1, 4))
     best = None
@@ -193,9 +131,6 @@ def fit_circle(points: List[Point]) -> Optional[dict]:
     """
     Fit x^2 + y^2 + Dx + Ey + F = 0 by linear least squares (Kasa's method),
     then recover center (a, b) = (-D/2, -E/2) and radius r.
-    Returns None if the fit isn't a valid circle (negative r^2) or the
-    average radial error is too large relative to r (i.e. it's not
-    actually circular, just closed).
     """
     xs = np.array([p.x for p in points])
     ys = np.array([p.y for p in points])
@@ -246,6 +181,51 @@ def _trim(x: float) -> str:
 
 
 # ----------------------------------------------------------------------
+# Corner-aware recursive segmentation
+# ----------------------------------------------------------------------
+def _find_corner_index(u: np.ndarray, v: np.ndarray) -> Optional[int]:
+    n = len(u)
+    if n < 6:
+        return None
+    u_span = max(u.max() - u.min(), 1e-9)
+    v_span = max(v.max() - v.min(), 1e-9)
+    un, vn = u / u_span, v / v_span
+    best_idx, best_angle = None, 0.0
+    for i in range(2, n - 2):
+        v1 = np.array([un[i] - un[i - 2], vn[i] - vn[i - 2]])
+        v2 = np.array([un[i + 2] - un[i], vn[i + 2] - vn[i]])
+        n1, n2 = np.linalg.norm(v1), np.linalg.norm(v2)
+        if n1 < 1e-9 or n2 < 1e-9:
+            continue
+        cos_angle = np.clip(np.dot(v1, v2) / (n1 * n2), -1, 1)
+        angle = np.degrees(np.arccos(cos_angle))
+        if angle > best_angle:
+            best_angle, best_idx = angle, i
+    if best_idx is not None and best_angle > 35:
+        return best_idx
+    return None
+
+
+def fit_run_recursive(pts: List[Point], axis: str, s: int, e: int, depth: int = 0, max_depth: int = 3):
+    dep = "y" if axis == "x" else "x"
+    seg = pts[s:e + 1]
+    u = np.array([getattr(p, axis) for p in seg])
+    v = np.array([getattr(p, dep) for p in seg])
+    fit = best_poly_fit(u, v)
+
+    corner = None if depth >= max_depth or len(seg) < 6 else _find_corner_index(u, v)
+    if corner is not None and (fit is None or fit["r2"] < 0.995):
+        mid = s + corner
+        left = fit_run_recursive(pts, axis, s, mid, depth + 1, max_depth)
+        right = fit_run_recursive(pts, axis, mid, e, depth + 1, max_depth)
+        return left + right
+
+    if fit is None:
+        return []
+    return [(s, e, fit)]
+
+
+# ----------------------------------------------------------------------
 # Top-level: stroke -> list[Equation]
 # ----------------------------------------------------------------------
 def process_stroke(raw_points: List[Point]) -> List[Equation]:
@@ -261,7 +241,6 @@ def process_stroke(raw_points: List[Point]) -> List[Equation]:
     closed_dist = float(np.hypot(pts[0].x - pts[-1].x, pts[0].y - pts[-1].y))
     aspect = (max(range_x, range_y) / min(range_x, range_y)) if range_x > 0 and range_y > 0 else float("inf")
 
-    # Closed, roughly-circular loop -> single circle equation
     if bbox_diag > 0.4 and closed_dist < 0.22 * bbox_diag and aspect < 1.8:
         circ = fit_circle(pts)
         if circ is not None:
@@ -275,12 +254,6 @@ def process_stroke(raw_points: List[Point]) -> List[Equation]:
                 index_range=(0, len(pts) - 1),
             )]
 
-    # Pick whichever axis is monotonic (or closer to it) as the independent
-    # variable -- e.g. a parabola should be reported as y = f(x) even if its
-    # bounding box happens to be taller than it is wide, because x increases
-    # steadily along the stroke while y doubles back at the vertex. Ties
-    # (e.g. a straight line, monotonic in both) fall back to whichever axis
-    # has more spread, since that's usually the more natural read.
     runs_x = split_monotonic_runs(pts, "x")
     runs_y = split_monotonic_runs(pts, "y")
     if len(runs_x) < len(runs_y):

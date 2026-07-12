@@ -2,9 +2,9 @@
 app.py
 ------
 Flask backend for sketch-eq. Serves the drawing UI and exposes a single
-/api/fit endpoint that runs the same fitting.process_stroke() used by the
-desktop version -- no logic is duplicated in JavaScript, the browser just
-sends raw stroke points and gets equations back.
+/api/fit endpoint that runs fitting.process_stroke() -- no logic is
+duplicated in JavaScript, the browser just sends raw stroke points and
+gets equations back.
 """
 
 import os

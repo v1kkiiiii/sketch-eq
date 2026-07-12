@@ -5,8 +5,6 @@ const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
 const dpr = Math.max(1, window.devicePixelRatio || 1);
 
-const PALETTE = ['#5EEAD4','#F2B84B','#F87171','#818CF8','#4ADE80','#F472B6','#60A5FA','#FBBF24','#C084FC','#2DD4BF'];
-
 const state = {
   strokes: [],          // {id, colorHex, points:[{x,y}] in MATH coords, equations:[...], pending:bool}
   currentRaw: [],
@@ -17,6 +15,8 @@ const state = {
   selectedEqId: null,
   nextId: 1,
   animT: 0,
+  bgColor: '#0A0E1A',
+  brushColor: '#E7ECFA',
 };
 
 let originX = 0, originY = 0;
@@ -41,6 +41,36 @@ function toMath(px, py) {
 function toPixel(x, y) {
   const s = state.baseScale * state.zoom;
   return { px: originX + x * s, py: originY - y * s };
+}
+
+// ============================================================
+// COLOR / CONTRAST HELPERS
+// ============================================================
+function hexToRgb(hex) {
+  const c = hex.replace('#', '');
+  return {
+    r: parseInt(c.substring(0, 2), 16),
+    g: parseInt(c.substring(2, 4), 16),
+    b: parseInt(c.substring(4, 6), 16),
+  };
+}
+function relativeLuminance(hex) {
+  const { r, g, b } = hexToRgb(hex);
+  const lin = (v) => {
+    v /= 255;
+    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+  };
+  return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b);
+}
+function isDarkBackground() {
+  return relativeLuminance(state.bgColor) < 0.5;
+}
+// grid/axis/tick colors auto-adjust so they stay legible against
+// whatever background color is picked
+function gridPalette() {
+  return isDarkBackground()
+    ? { grid: '#161D38', axis: '#313C67', tick: '#545F87' }
+    : { grid: '#D8DCE8', axis: '#9AA3C0', tick: '#6B7280' };
 }
 
 // ============================================================
@@ -70,11 +100,12 @@ function drawGrid() {
   const rect = canvas.getBoundingClientRect();
   const w = rect.width, h = rect.height;
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = '#0A0E1A';
+  ctx.fillStyle = state.bgColor;
   ctx.fillRect(0, 0, w, h);
 
+  const { grid, axis, tick } = gridPalette();
   const s = state.baseScale * state.zoom;
-  ctx.strokeStyle = '#161D38';
+  ctx.strokeStyle = grid;
   ctx.lineWidth = 1;
   ctx.beginPath();
   const startX = originX % s, startY = originY % s;
@@ -82,14 +113,14 @@ function drawGrid() {
   for (let y = startY; y < h; y += s) { ctx.moveTo(0, y); ctx.lineTo(w, y); }
   ctx.stroke();
 
-  ctx.strokeStyle = '#313C67';
+  ctx.strokeStyle = axis;
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.moveTo(0, originY); ctx.lineTo(w, originY);
   ctx.moveTo(originX, 0); ctx.lineTo(originX, h);
   ctx.stroke();
 
-  ctx.fillStyle = '#545F87';
+  ctx.fillStyle = tick;
   ctx.font = '10px "JetBrains Mono", monospace';
   const step = state.zoom < 0.6 ? 5 : (state.zoom > 1.8 ? 1 : 2);
   for (let ux = -40; ux <= 40; ux += step) {
@@ -148,7 +179,7 @@ function render() {
   }
 
   if (state.drawing && state.currentRaw.length > 1) {
-    ctx.strokeStyle = '#E7ECFA';
+    ctx.strokeStyle = state.brushColor;
     ctx.globalAlpha = 0.55;
     ctx.lineWidth = 2.25;
     ctx.lineCap = 'round';
@@ -262,7 +293,7 @@ async function finishStroke() {
   const mathPts = state.currentRaw.map(p => toMath(p.x, p.y));
   const stroke = {
     id: state.nextId++,
-    colorHex: PALETTE[state.strokes.length % PALETTE.length],
+    colorHex: state.brushColor,
     points: mathPts,
     equations: [],
     pending: true,
@@ -317,6 +348,14 @@ document.getElementById('clear-btn').addEventListener('click', () => {
   state.selectedEqId = null;
   renderSidebar();
   render();
+});
+
+document.getElementById('bg-color').addEventListener('input', (e) => {
+  state.bgColor = e.target.value;
+  render();
+});
+document.getElementById('brush-color').addEventListener('input', (e) => {
+  state.brushColor = e.target.value;
 });
 
 window.addEventListener('keydown', (e) => {

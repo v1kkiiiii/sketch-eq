@@ -1,10 +1,15 @@
 # sketch·eq (web)
 
-Browser version of sketch-eq: draw a curve, get its equation, deployed as a
-Flask app. The curve-fitting math is unchanged from the desktop version --
-`fitting.py` is the exact same file, exercised through a `/api/fit` endpoint
-instead of a PyQt5 GUI. Drawing and rendering stay client-side in vanilla
-JS/canvas; the actual regression happens server-side.
+Browser version of sketch-eq: draw a curve, get its equation. Curve-fitting
+math is unchanged from the desktop version -- `fitting.py` is the exact
+same file, exercised through a `/api/fit` endpoint instead of a PyQt5 GUI.
+Drawing/rendering stay client-side in vanilla JS/canvas; regression happens
+server-side.
+
+Background and brush color are user-selectable via the pickers in the
+sidebar. The grid automatically switches between light and dark tones
+(based on the background's relative luminance) so it stays legible against
+whatever color is picked.
 
 ## Run locally
 
@@ -15,16 +20,19 @@ pip install -r requirements.txt
 python3 app.py
 ```
 
-Then open http://localhost:5000
+Then open http://localhost:5000 (if port 5000 is taken -- common on macOS
+due to AirPlay Receiver -- run `PORT=5050 python3 app.py` instead).
 
 ## Deploy to Railway
 
-1. Push this folder to a GitHub repo (see steps below if you haven't).
-2. Go to [railway.app](https://railway.app) → New Project → Deploy from GitHub repo → pick this repo.
-3. Railway auto-detects Python from `requirements.txt` and uses the `Procfile`
-   to run `gunicorn app:app` -- no extra config needed.
-4. Once it builds, Railway gives you a public URL under Settings → Networking
-   → Generate Domain.
+1. Push this folder to GitHub (as a `web/` subfolder alongside the desktop
+   version, or as its own repo).
+2. railway.app -> New Project -> Deploy from GitHub repo.
+3. If it's in a subfolder, set Settings -> Root Directory to that folder
+   name (e.g. `web`).
+4. Railway auto-detects Python from `requirements.txt` and runs the
+   `Procfile` (`gunicorn app:app`) -- no extra config needed.
+5. Settings -> Networking -> Generate Domain for a public URL.
 
 ## API
 
@@ -39,16 +47,16 @@ returns
 ]}
 ```
 
-`GET /healthz` -- returns `{"status": "ok"}`, useful for Railway's health checks.
+`GET /healthz` -- `{"status": "ok"}`
 
 ## Project layout
 
 ```
-app.py            Flask routes: serves the page, exposes /api/fit
-fitting.py         same math core as the desktop version (unmodified)
+app.py              Flask routes: serves the page, exposes /api/fit
+fitting.py            same math core as the desktop version
 templates/index.html
 static/style.css
-static/app.js       drawing, rendering, zoom/undo -- calls /api/fit on each stroke
+static/app.js         drawing, rendering, color pickers, zoom/undo
 requirements.txt
-Procfile            tells Railway how to start the app (gunicorn)
+Procfile
 ```
