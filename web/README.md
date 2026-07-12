@@ -1,5 +1,7 @@
 # sketch·eq (web)
 
+**[Try it live →](https://sketch-eq-production.up.railway.app/)**
+
 Browser version of sketch-eq: draw a curve, get its equation. Curve-fitting
 math is unchanged from the desktop version -- `fitting.py` is the exact
 same file, exercised through a `/api/fit` endpoint instead of a PyQt5 GUI.
