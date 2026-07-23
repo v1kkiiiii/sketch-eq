@@ -1,64 +1,44 @@
 # sketch·eq (web)
 
-**[Try it live →](https://sketch-eq-production.up.railway.app/)**
+Try it live: https://sketch-eq-production.up.railway.app/
 
-Browser version of sketch-eq: draw a curve, get its equation. Curve-fitting
-math is unchanged from the desktop version -- `fitting.py` is the exact
-same file, exercised through a `/api/fit` endpoint instead of a PyQt5 GUI.
-Drawing/rendering stay client-side in vanilla JS/canvas; regression happens
-server-side.
+Browser version of sketch-eq. Same math as the desktop app, fitting.py is the literal same file, just called through a /api/fit endpoint instead of a PyQt5 GUI. Drawing and rendering happen in plain JS and canvas on the frontend, the actual regression runs server side.
 
-Background and brush color are user-selectable via the pickers in the
-sidebar. The grid automatically switches between light and dark tones
-(based on the background's relative luminance) so it stays legible against
-whatever color is picked.
+Background and brush color are both pickable from the sidebar. The grid automatically flips between light and dark tones based on the background color's brightness, so it stays readable no matter what color you pick.
 
 ## Run locally
 
-```bash
+```
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 python3 app.py
 ```
 
-Then open http://localhost:5000 (if port 5000 is taken -- common on macOS
-due to AirPlay Receiver -- run `PORT=5050 python3 app.py` instead).
+Then go to http://localhost:5000 (or if port 5000 is taken, which happens a lot on macOS because of AirPlay, run PORT=5050 python3 app.py instead).
 
 ## Deploy to Railway
 
-1. Push this folder to GitHub (as a `web/` subfolder alongside the desktop
-   version, or as its own repo).
-2. railway.app -> New Project -> Deploy from GitHub repo.
-3. If it's in a subfolder, set Settings -> Root Directory to that folder
-   name (e.g. `web`).
-4. Railway auto-detects Python from `requirements.txt` and runs the
-   `Procfile` (`gunicorn app:app`) -- no extra config needed.
-5. Settings -> Networking -> Generate Domain for a public URL.
+1. Push this folder to GitHub.
+2. railway.app, New Project, Deploy from GitHub repo.
+3. Since it's in a subfolder, go to Settings, Root Directory, and set it to web.
+4. Railway picks up Python automatically from requirements.txt and runs the Procfile, no extra config needed.
+5. Settings, Networking, Generate Domain for a public URL.
 
 ## API
 
-`POST /api/fit`
-```json
-{ "points": [{"x": 0.1, "y": 0.4}, {"x": 0.2, "y": 0.6}, ...] }
-```
-returns
-```json
-{ "equations": [
-  {"latex": "y = 2x + 3", "domain": "-1.0 ≤ x ≤ 4.2", "meta": "deg 1 poly · R² = 1.0", "range": [0, 14]}
-]}
-```
+POST /api/fit returns a list of equations as JSON, each with a latex string, a domain string, and a range of point indices for highlighting.
 
-`GET /healthz` -- `{"status": "ok"}`
+GET /healthz returns {"status": "ok"}
 
 ## Project layout
 
 ```
-app.py              Flask routes: serves the page, exposes /api/fit
-fitting.py            same math core as the desktop version
+app.py              Flask routes, serves the page and the /api/fit endpoint
+fitting.py           same math core as the desktop version
 templates/index.html
 static/style.css
-static/app.js         drawing, rendering, color pickers, zoom/undo
+static/app.js         drawing, rendering, color pickers, zoom, undo
 requirements.txt
 Procfile
 ```
